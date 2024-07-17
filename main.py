@@ -4,6 +4,8 @@ import json
 from datetime import datetime, timedelta
 import csv
 import hashlib
+import sched
+import time
 
 # Initialize a dictionary to store tasks and user information
 users = {}
@@ -109,7 +111,11 @@ class TodoApp:
         tk.Button(self.main_frame, text="List Tasks", command=self.list_tasks).grid(row=1, column=1, pady=5)
         tk.Button(self.main_frame, text="Export Tasks", command=self.export_tasks).grid(row=2, column=0, pady=5)
         tk.Button(self.main_frame, text="Import Tasks", command=self.import_tasks).grid(row=2, column=1, pady=5)
-        tk.Button(self.main_frame, text="Logout", command=self.logout_user).grid(row=3, column=0, columnspan=2, pady=10)
+        tk.Button(self.main_frame, text="Search Tasks", command=self.create_search_screen).grid(row=3, column=0, pady=5)
+        tk.Button(self.main_frame, text="Logout", command=self.logout_user).grid(row=3, column=1, pady=5)
+
+        # Add notifications button
+        tk.Button(self.main_frame, text="Upcoming Tasks", command=self.show_upcoming_tasks).grid(row=4, column=0, columnspan=2, pady=5)
 
     def create_add_task_screen(self):
         self.clear_screen()
@@ -171,27 +177,33 @@ class TodoApp:
         self.list_tasks_frame = tk.Frame(self.root)
         self.list_tasks_frame.pack(pady=20)
 
-        tk.Label(self.list_tasks_frame, text=f"Tasks for {self.current_user}:").grid(row=0, column=0, columnspan=6)
+        tk.Label(self.list_tasks_frame, text=f"Tasks for {self.current_user}:").grid(row=0, column=0, columnspan=8)
 
         tasks = users[self.current_user]['tasks']
 
         if tasks:
             for idx, task in enumerate(tasks):
-                tk.Label(self.list_tasks_frame, text=f"ID: {task['id']}").grid(row=idx+1, column=0)
-                tk.Label(self.list_tasks_frame, text=f"Description: {task['description']}").grid(row=idx+1, column=1)
-                tk.Label(self.list_tasks_frame, text=f"Priority: {task['priority']}").grid(row=idx+1, column=2)
-                tk.Label(self.list_tasks_frame, text=f"Due Date: {task['due_date']}").grid(row=idx+1, column=3)
-                tk.Label(self.list_tasks_frame, text=f"Category: {task['category']}").grid(row=idx+1, column=4)
-                tk.Label(self.list_tasks_frame, text=f"Status: {task['status']}").grid(row=idx+1, column=5)
-                tk.Label(self.list_tasks_frame, text=f"Recurring: {task['recurring_days']} days").grid(row=idx+1, column=6)
-                tk.Button(self.list_tasks_frame, text="Complete", command=lambda task_id=task['id']: self.complete_task(task_id)).grid(row=idx+1, column=7)
-                tk.Button(self.list_tasks_frame, text="Edit", command=lambda task_id=task['id']: self.create_edit_task_screen(task_id)).grid(row=idx+1, column=8)
-                tk.Button(self.list_tasks_frame, text="Delete", command=lambda task_id=task['id']: self.delete_task(task_id)).grid(row=idx+1, column=9)
-                tk.Button(self.list_tasks_frame, text="Add Subtask", command=lambda task_id=task['id']: self.create_add_subtask_screen(task_id)).grid(row=idx+1, column=10)
+                row_idx = idx + 1
+                tk.Label(self.list_tasks_frame, text=f"ID: {task['id']}").grid(row=row_idx, column=0)
+                tk.Label(self.list_tasks_frame, text=f"Description: {task['description']}").grid(row=row_idx, column=1)
+                tk.Label(self.list_tasks_frame, text=f"Priority: {task['priority']}").grid(row=row_idx, column=2)
+                tk.Label(self.list_tasks_frame, text=f"Due Date: {task['due_date']}").grid(row=row_idx, column=3)
+                tk.Label(self.list_tasks_frame, text=f"Category: {task['category']}").grid(row=row_idx, column=4)
+                tk.Label(self.list_tasks_frame, text=f"Status: {task['status']}").grid(row=row_idx, column=5)
+                tk.Label(self.list_tasks_frame, text=f"Recurring: {task['recurring_days']} days").grid(row=row_idx, column=6)
 
+                # Buttons
+                tk.Button(self.list_tasks_frame, text="Complete", command=lambda task_id=task['id']: self.complete_task(task_id)).grid(row=row_idx, column=7)
+                tk.Button(self.list_tasks_frame, text="Edit", command=lambda task_id=task['id']: self.create_edit_task_screen(task_id)).grid(row=row_idx, column=8)
+                tk.Button(self.list_tasks_frame, text="Delete", command=lambda task_id=task['id']: self.delete_task(task_id)).grid(row=row_idx, column=9)
+                tk.Button(self.list_tasks_frame, text="Add Subtask", command=lambda task_id=task['id']: self.create_add_subtask_screen(task_id)).grid(row=row_idx, column=10)
+
+                # Subtasks
                 for sub_idx, subtask in enumerate(task['subtasks']):
-                    tk.Label(self.list_tasks_frame, text=f"  Subtask: {subtask['description']}").grid(row=idx+sub_idx+2, column=1, columnspan=4)
-                    tk.Button(self.list_tasks_frame, text="Complete", command=lambda task_id=task['id'], subtask_id=subtask['id']: self.complete_subtask(task_id, subtask_id)).grid(row=idx+sub_idx+2, column=7)
+                    sub_row_idx = row_idx + sub_idx + 1
+                    tk.Label(self.list_tasks_frame, text=f"  Subtask: {subtask['description']}").grid(row=sub_row_idx, column=1, columnspan=4)
+                    tk.Button(self.list_tasks_frame, text="Complete", command=lambda task_id=task['id'], subtask_id=subtask['id']: self.complete_subtask(task_id, subtask_id)).grid(row=sub_row_idx, column=7)
+
         else:
             tk.Label(self.list_tasks_frame, text="No tasks found").grid(row=1, column=0, columnspan=6)
 
@@ -352,6 +364,117 @@ class TodoApp:
             messagebox.showinfo("Success", f"Tasks imported from {filename}")
             self.list_tasks()
 
+    def create_search_screen(self):
+        self.clear_screen()
+
+        self.search_frame = tk.Frame(self.root)
+        self.search_frame.pack(pady=20)
+
+        tk.Label(self.search_frame, text="Search by:").grid(row=0, column=0)
+
+        search_var = tk.StringVar()
+        search_var.set("description")
+
+        search_options = ttk.Combobox(self.search_frame, textvariable=search_var, values=["description", "category", "priority"])
+        search_options.grid(row=0, column=1)
+
+        tk.Label(self.search_frame, text="Keyword:").grid(row=1, column=0)
+        self.keyword_entry = tk.Entry(self.search_frame)
+        self.keyword_entry.grid(row=1, column=1)
+
+        tk.Button(self.search_frame, text="Search", command=self.perform_search).grid(row=2, column=0, columnspan=2, pady=10)
+        tk.Button(self.search_frame, text="Back", command=self.create_main_screen).grid(row=3, column=0, columnspan=2, pady=10)
+
+    def perform_search(self):
+        search_by = search_options.get()
+        keyword = self.keyword_entry.get().lower()
+        results = []
+
+        for task in users[self.current_user]['tasks']:
+            if keyword in task[search_by].lower():
+                results.append(task)
+
+        if results:
+            self.display_search_results(results)
+        else:
+            messagebox.showinfo("No Results", "No tasks found matching the search criteria.")
+
+    def display_search_results(self, results):
+        self.clear_screen()
+
+        self.search_results_frame = tk.Frame(self.root)
+        self.search_results_frame.pack(pady=20)
+
+        tk.Label(self.search_results_frame, text=f"Search Results:").grid(row=0, column=0, columnspan=8)
+
+        for idx, task in enumerate(results):
+            row_idx = idx + 1
+            tk.Label(self.search_results_frame, text=f"ID: {task['id']}").grid(row=row_idx, column=0)
+            tk.Label(self.search_results_frame, text=f"Description: {task['description']}").grid(row=row_idx, column=1)
+            tk.Label(self.search_results_frame, text=f"Priority: {task['priority']}").grid(row=row_idx, column=2)
+            tk.Label(self.search_results_frame, text=f"Due Date: {task['due_date']}").grid(row=row_idx, column=3)
+            tk.Label(self.search_results_frame, text=f"Category: {task['category']}").grid(row=row_idx, column=4)
+            tk.Label(self.search_results_frame, text=f"Status: {task['status']}").grid(row=row_idx, column=5)
+            tk.Label(self.search_results_frame, text=f"Recurring: {task['recurring_days']} days").grid(row=row_idx, column=6)
+
+            # Buttons
+            tk.Button(self.search_results_frame, text="Complete", command=lambda task_id=task['id']: self.complete_task(task_id)).grid(row=row_idx, column=7)
+            tk.Button(self.search_results_frame, text="Edit", command=lambda task_id=task['id']: self.create_edit_task_screen(task_id)).grid(row=row_idx, column=8)
+            tk.Button(self.search_results_frame, text="Delete", command=lambda task_id=task['id']: self.delete_task(task_id)).grid(row=row_idx, column=9)
+            tk.Button(self.search_results_frame, text="Add Subtask", command=lambda task_id=task['id']: self.create_add_subtask_screen(task_id)).grid(row=row_idx, column=10)
+
+            # Subtasks
+            for sub_idx, subtask in enumerate(task['subtasks']):
+                sub_row_idx = row_idx + sub_idx + 1
+                tk.Label(self.search_results_frame, text=f"  Subtask: {subtask['description']}").grid(row=sub_row_idx, column=1, columnspan=4)
+                tk.Button(self.search_results_frame, text="Complete", command=lambda task_id=task['id'], subtask_id=subtask['id']: self.complete_subtask(task_id, subtask_id)).grid(row=sub_row_idx, column=7)
+
+        tk.Button(self.search_results_frame, text="Back", command=self.create_search_screen).grid(row=len(results)+2, column=0, columnspan=6, pady=10)
+
+    def show_upcoming_tasks(self):
+        self.clear_screen()
+
+        self.upcoming_tasks_frame = tk.Frame(self.root)
+        self.upcoming_tasks_frame.pack(pady=20)
+
+        tk.Label(self.upcoming_tasks_frame, text="Upcoming Tasks:").grid(row=0, column=0, columnspan=8)
+
+        today = datetime.now().date()
+        upcoming_tasks = []
+
+        for task in users[self.current_user]['tasks']:
+            due_date = datetime.strptime(task['due_date'], "%Y-%m-%d").date()
+            if (due_date - today).days <= 1 and task['status'] == 'pending':
+                upcoming_tasks.append(task)
+
+        if upcoming_tasks:
+            for idx, task in enumerate(upcoming_tasks):
+                row_idx = idx + 1
+                tk.Label(self.upcoming_tasks_frame, text=f"ID: {task['id']}").grid(row=row_idx, column=0)
+                tk.Label(self.upcoming_tasks_frame, text=f"Description: {task['description']}").grid(row=row_idx, column=1)
+                tk.Label(self.upcoming_tasks_frame, text=f"Priority: {task['priority']}").grid(row=row_idx, column=2)
+                tk.Label(self.upcoming_tasks_frame, text=f"Due Date: {task['due_date']}").grid(row=row_idx, column=3)
+                tk.Label(self.upcoming_tasks_frame, text=f"Category: {task['category']}").grid(row=row_idx, column=4)
+                tk.Label(self.upcoming_tasks_frame, text=f"Status: {task['status']}").grid(row=row_idx, column=5)
+                tk.Label(self.upcoming_tasks_frame, text=f"Recurring: {task['recurring_days']} days").grid(row=row_idx, column=6)
+
+                # Buttons
+                tk.Button(self.upcoming_tasks_frame, text="Complete", command=lambda task_id=task['id']: self.complete_task(task_id)).grid(row=row_idx, column=7)
+                tk.Button(self.upcoming_tasks_frame, text="Edit", command=lambda task_id=task['id']: self.create_edit_task_screen(task_id)).grid(row=row_idx, column=8)
+                tk.Button(self.upcoming_tasks_frame, text="Delete", command=lambda task_id=task['id']: self.delete_task(task_id)).grid(row=row_idx, column=9)
+                tk.Button(self.upcoming_tasks_frame, text="Add Subtask", command=lambda task_id=task['id']: self.create_add_subtask_screen(task_id)).grid(row=row_idx, column=10)
+
+                # Subtasks
+                for sub_idx, subtask in enumerate(task['subtasks']):
+                    sub_row_idx = row_idx + sub_idx + 1
+                    tk.Label(self.upcoming_tasks_frame, text=f"  Subtask: {subtask['description']}").grid(row=sub_row_idx, column=1, columnspan=4)
+                    tk.Button(self.upcoming_tasks_frame, text="Complete", command=lambda task_id=task['id'], subtask_id=subtask['id']: self.complete_subtask(task_id, subtask_id)).grid(row=sub_row_idx, column=7)
+
+        else:
+            tk.Label(self.upcoming_tasks_frame, text="No upcoming tasks found").grid(row=1, column=0, columnspan=6)
+
+        tk.Button(self.upcoming_tasks_frame, text="Back", command=self.create_main_screen).grid(row=len(upcoming_tasks)+2, column=0, columnspan=6, pady=10)
+
     def logout_user(self):
         self.current_user = None
         self.create_login_screen()
@@ -361,8 +484,6 @@ class TodoApp:
             widget.destroy()
 
 if __name__ == "__main__":
-    load_data_from_file()  # Load tasks from file on startup
-
     root = tk.Tk()
     app = TodoApp(root)
     root.mainloop()
