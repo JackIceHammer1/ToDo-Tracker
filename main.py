@@ -4,24 +4,27 @@ import json
 # Initialize tasks list (will store dictionary objects for enhanced details)
 tasks = []
 
-def add_task(task_description, priority='low', due_date=None):
+def add_task(task_description, priority='low', due_date=None, category=None):
     """Add a new task to the task list."""
     task = {
         'id': len(tasks) + 1,
         'description': task_description,
         'priority': priority,
         'due_date': due_date,
+        'category': category,
         'status': 'pending'  # Default status
     }
     tasks.append(task)
     print(f"Task added: '{task_description}'")
 
-def list_tasks():
-    """Display all tasks in the task list."""
+def list_tasks(category_filter=None):
+    """Display all tasks in the task list, optionally filtered by category."""
     if tasks:
         print("Tasks:")
         for task in tasks:
-            print(f"ID: {task['id']}, Description: {task['description']}, Priority: {task['priority']}, Due Date: {task['due_date']}, Status: {task['status']}")
+            if category_filter and task['category'] != category_filter:
+                continue
+            print(f"ID: {task['id']}, Description: {task['description']}, Priority: {task['priority']}, Due Date: {task['due_date']}, Category: {task['category']}, Status: {task['status']}")
     else:
         print("No tasks found.")
 
@@ -34,7 +37,7 @@ def mark_task_complete(task_id):
             return
     print(f"Task ID {task_id} not found.")
 
-def edit_task(task_id, new_description=None, new_priority=None, new_due_date=None):
+def edit_task(task_id, new_description=None, new_priority=None, new_due_date=None, new_category=None):
     """Edit an existing task."""
     for task in tasks:
         if task['id'] == task_id:
@@ -44,6 +47,8 @@ def edit_task(task_id, new_description=None, new_priority=None, new_due_date=Non
                 task['priority'] = new_priority
             if new_due_date:
                 task['due_date'] = new_due_date
+            if new_category:
+                task['category'] = new_category
             print(f"Task ID {task_id} has been updated.")
             return
     print(f"Task ID {task_id} not found.")
@@ -85,17 +90,19 @@ def main():
     parser.add_argument('--description', help='Task description for add or edit command')
     parser.add_argument('--priority', choices=['low', 'medium', 'high'], default=None, help='Task priority for add or edit command')
     parser.add_argument('--due_date', help='Due date for the task (optional)')
+    parser.add_argument('--category', help='Task category for add or edit command')
     parser.add_argument('--task_id', type=int, help='Task ID for edit, complete, or delete command')
+    parser.add_argument('--filter_category', help='Filter tasks by category')
 
     args = parser.parse_args()
 
     if args.command == 'add':
         if args.description:
-            add_task(args.description, args.priority, args.due_date)
+            add_task(args.description, args.priority, args.due_date, args.category)
         else:
             print("Error: Missing task description. Use '--description <task_description>'.")
     elif args.command == 'list':
-        list_tasks()
+        list_tasks(args.filter_category)
     elif args.command == 'complete':
         if args.task_id:
             mark_task_complete(args.task_id)
@@ -103,7 +110,7 @@ def main():
             print("Error: Missing task ID. Use '--task_id <task_id>'.")
     elif args.command == 'edit':
         if args.task_id:
-            edit_task(args.task_id, args.description, args.priority, args.due_date)
+            edit_task(args.task_id, args.description, args.priority, args.due_date, args.category)
         else:
             print("Error: Missing task ID. Use '--task_id <task_id>'.")
     elif args.command == 'delete':
