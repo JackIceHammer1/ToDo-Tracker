@@ -1,5 +1,6 @@
 import argparse
 import json
+from datetime import datetime, timedelta
 
 # Initialize tasks list (will store dictionary objects for enhanced details)
 tasks = []
@@ -28,6 +29,22 @@ def list_tasks(category_filter=None):
     else:
         print("No tasks found.")
 
+def list_upcoming_tasks(days=3):
+    """Display tasks with due dates approaching within the specified number of days."""
+    upcoming_tasks = []
+    now = datetime.now()
+    for task in tasks:
+        if task['due_date']:
+            due_date = datetime.strptime(task['due_date'], '%Y-%m-%d')
+            if now <= due_date <= now + timedelta(days=days):
+                upcoming_tasks.append(task)
+    if upcoming_tasks:
+        print(f"Tasks due within {days} days:")
+        for task in upcoming_tasks:
+            print(f"ID: {task['id']}, Description: {task['description']}, Due Date: {task['due_date']}, Priority: {task['priority']}, Category: {task['category']}, Status: {task['status']}")
+    else:
+        print(f"No tasks due within the next {days} days.")
+
 def mark_task_complete(task_id):
     """Mark a task as complete."""
     for task in tasks:
@@ -35,7 +52,7 @@ def mark_task_complete(task_id):
             task['status'] = 'completed'
             print(f"Task ID {task_id} marked as completed.")
             return
-    print(f"Task ID {task_id} not found.")
+    print(f"Error: Task ID {task_id} not found.")
 
 def edit_task(task_id, new_description=None, new_priority=None, new_due_date=None, new_category=None):
     """Edit an existing task."""
@@ -51,7 +68,7 @@ def edit_task(task_id, new_description=None, new_priority=None, new_due_date=Non
                 task['category'] = new_category
             print(f"Task ID {task_id} has been updated.")
             return
-    print(f"Task ID {task_id} not found.")
+    print(f"Error: Task ID {task_id} not found.")
 
 def delete_task(task_id):
     """Delete a task from the task list."""
@@ -66,7 +83,7 @@ def delete_task(task_id):
             else:
                 print("Task deletion canceled.")
                 return
-    print(f"Task ID {task_id} not found.")
+    print(f"Error: Task ID {task_id} not found.")
 
 def save_tasks_to_file(filename='tasks.json'):
     """Save tasks to a JSON file."""
@@ -86,13 +103,13 @@ def main():
     load_tasks_from_file()  # Load tasks from file on startup
 
     parser = argparse.ArgumentParser(description="Python To-Do List Tracker")
-    parser.add_argument('command', choices=['add', 'list', 'complete', 'edit', 'delete'], help='Command to execute')
+    parser.add_argument('command', choices=['add', 'list', 'complete', 'edit', 'delete', 'upcoming'], help='Command to execute')
     parser.add_argument('--description', help='Task description for add or edit command')
     parser.add_argument('--priority', choices=['low', 'medium', 'high'], default=None, help='Task priority for add or edit command')
     parser.add_argument('--due_date', help='Due date for the task (optional)')
     parser.add_argument('--category', help='Task category for add or edit command')
     parser.add_argument('--task_id', type=int, help='Task ID for edit, complete, or delete command')
-    parser.add_argument('--filter_category', help='Filter tasks by category')
+    parser.add_argument('--days', type=int, default=3, help='Number of days for upcoming tasks filter')
 
     args = parser.parse_args()
 
@@ -102,7 +119,7 @@ def main():
         else:
             print("Error: Missing task description. Use '--description <task_description>'.")
     elif args.command == 'list':
-        list_tasks(args.filter_category)
+        list_tasks(args.category)
     elif args.command == 'complete':
         if args.task_id:
             mark_task_complete(args.task_id)
@@ -118,6 +135,8 @@ def main():
             delete_task(args.task_id)
         else:
             print("Error: Missing task ID. Use '--task_id <task_id>'.")
+    elif args.command == 'upcoming':
+        list_upcoming_tasks(args.days)
 
     save_tasks_to_file()  # Save tasks to file after each modification
 
