@@ -1,110 +1,12 @@
-import argparse
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
 import json
-import csv
 from datetime import datetime
+import csv
 
 # Initialize a dictionary to store tasks for different users
 users = {}
-
-def add_task(user, task_description, priority='low', due_date=None, category=None):
-    """Add a new task to the task list for a user."""
-    if user not in users:
-        users[user] = []
-    
-    task = {
-        'id': len(users[user]) + 1,
-        'description': task_description,
-        'priority': priority,
-        'due_date': due_date,
-        'category': category,
-        'status': 'pending'  # Default status
-    }
-    users[user].append(task)
-    print(f"Task added for {user}: '{task_description}'")
-
-def list_tasks(user, filter_by=None, filter_value=None, reminders=False, sort_by=None):
-    """Display all tasks in the task list for a user, with optional filtering and sorting."""
-    if user not in users or not users[user]:
-        print(f"No tasks found for {user}.")
-        return
-
-    tasks = users[user]
-
-    if filter_by and filter_value:
-        tasks = [task for task in tasks if task[filter_by] == filter_value]
-    
-    if sort_by:
-        tasks = sorted(tasks, key=lambda x: x[sort_by])
-
-    if tasks:
-        print(f"Tasks for {user}:")
-        for task in tasks:
-            print(f"ID: {task['id']}, Description: {task['description']}, Priority: {task['priority']}, Due Date: {task['due_date']}, Category: {task['category']}, Status: {task['status']}")
-            if reminders:
-                check_due_date(task)
-    else:
-        print("No tasks found.")
-
-def check_due_date(task):
-    """Check if a task's due date is approaching or overdue and print a reminder."""
-    if task['due_date']:
-        due_date = datetime.strptime(task['due_date'], "%Y-%m-%d")
-        days_left = (due_date - datetime.now()).days
-        if days_left < 0:
-            print(f"Reminder: Task ID {task['id']} is overdue!")
-        elif days_left <= 3:
-            print(f"Reminder: Task ID {task['id']} is due in {days_left} days.")
-
-def mark_task_complete(user, task_id):
-    """Mark a task as complete for a user."""
-    if user not in users:
-        print(f"No tasks found for {user}.")
-        return
-
-    for task in users[user]:
-        if task['id'] == task_id:
-            task['status'] = 'completed'
-            print(f"Task ID {task_id} for {user} marked as completed.")
-            return
-    print(f"Task ID {task_id} not found for {user}.")
-
-def edit_task(user, task_id, new_description=None, new_priority=None, new_due_date=None, new_category=None):
-    """Edit an existing task for a user."""
-    if user not in users:
-        print(f"No tasks found for {user}.")
-        return
-
-    for task in users[user]:
-        if task['id'] == task_id:
-            if new_description:
-                task['description'] = new_description
-            if new_priority:
-                task['priority'] = new_priority
-            if new_due_date:
-                task['due_date'] = new_due_date
-            if new_category:
-                task['category'] = new_category
-            print(f"Task ID {task_id} for {user} has been updated.")
-            return
-    print(f"Task ID {task_id} not found for {user}.")
-
-def delete_task(user, task_id):
-    """Delete a task from the task list for a user."""
-    if user not in users:
-        print(f"No tasks found for {user}.")
-        return
-
-    for task in users[user]:
-        if task['id'] == task_id:
-            confirmation = input(f"Are you sure you want to delete task ID {task_id} for {user}? (yes/no): ")
-            if confirmation.lower() == 'yes':
-                users[user] = [task for task in users[user] if task['id'] != task_id]
-                print(f"Task ID {task_id} for {user} has been deleted.")
-                return
-            else:
-                print("Task deletion canceled.")
-                return
-    print(f"Task ID {task_id} not found for {user}.")
 
 def save_tasks_to_file(filename='tasks.json'):
     """Save tasks to a JSON file."""
@@ -120,95 +22,138 @@ def load_tasks_from_file(filename='tasks.json'):
     except FileNotFoundError:
         users = {}  # Start with an empty dictionary if file doesn't exist
 
-def export_tasks_to_csv(user, filename):
-    """Export tasks for a user to a CSV file."""
-    if user not in users or not users[user]:
-        print(f"No tasks found for {user}.")
-        return
+class TodoApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("To-Do List Tracker")
 
-    with open(filename, 'w', newline='') as csvfile:
-        fieldnames = ['id', 'description', 'priority', 'due_date', 'category', 'status']
-        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        self.current_user = None
 
-        writer.writeheader()
-        for task in users[user]:
-            writer.writerow(task)
+        self.create_login_screen()
 
-    print(f"Tasks for {user} exported to {filename}.")
+    def create_login_screen(self):
+        self.clear_screen()
+        
+        self.login_frame = tk.Frame(self.root)
+        self.login_frame.pack(pady=20)
 
-def import_tasks_from_csv(user, filename):
-    """Import tasks for a user from a CSV file."""
-    if user not in users:
-        users[user] = []
+        tk.Label(self.login_frame, text="Username:").grid(row=0, column=0)
+        self.username_entry = tk.Entry(self.login_frame)
+        self.username_entry.grid(row=0, column=1)
 
-    with open(filename, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
+        tk.Button(self.login_frame, text="Login", command=self.login_user).grid(row=1, column=0, columnspan=2, pady=10)
+
+    def login_user(self):
+        username = self.username_entry.get()
+        if username:
+            self.current_user = username
+            if username not in users:
+                users[username] = []
+            self.create_main_screen()
+        else:
+            messagebox.showerror("Error", "Please enter a username")
+
+    def create_main_screen(self):
+        self.clear_screen()
+
+        self.main_frame = tk.Frame(self.root)
+        self.main_frame.pack(pady=20)
+
+        tk.Label(self.main_frame, text=f"Welcome, {self.current_user}").grid(row=0, column=0, columnspan=2)
+
+        tk.Button(self.main_frame, text="Add Task", command=self.create_add_task_screen).grid(row=1, column=0, pady=5)
+        tk.Button(self.main_frame, text="List Tasks", command=self.list_tasks).grid(row=1, column=1, pady=5)
+        tk.Button(self.main_frame, text="Export Tasks", command=self.export_tasks).grid(row=2, column=0, pady=5)
+        tk.Button(self.main_frame, text="Import Tasks", command=self.import_tasks).grid(row=2, column=1, pady=5)
+        tk.Button(self.main_frame, text="Logout", command=self.logout_user).grid(row=3, column=0, columnspan=2, pady=10)
+
+    def create_add_task_screen(self):
+        self.clear_screen()
+
+        self.add_task_frame = tk.Frame(self.root)
+        self.add_task_frame.pack(pady=20)
+
+        tk.Label(self.add_task_frame, text="Description:").grid(row=0, column=0)
+        self.description_entry = tk.Entry(self.add_task_frame)
+        self.description_entry.grid(row=0, column=1)
+
+        tk.Label(self.add_task_frame, text="Priority:").grid(row=1, column=0)
+        self.priority_var = tk.StringVar(value="low")
+        tk.OptionMenu(self.add_task_frame, self.priority_var, "low", "medium", "high").grid(row=1, column=1)
+
+        tk.Label(self.add_task_frame, text="Due Date (YYYY-MM-DD):").grid(row=2, column=0)
+        self.due_date_entry = tk.Entry(self.add_task_frame)
+        self.due_date_entry.grid(row=2, column=1)
+
+        tk.Label(self.add_task_frame, text="Category:").grid(row=3, column=0)
+        self.category_entry = tk.Entry(self.add_task_frame)
+        self.category_entry.grid(row=3, column=1)
+
+        tk.Button(self.add_task_frame, text="Add Task", command=self.add_task).grid(row=4, column=0, columnspan=2, pady=10)
+        tk.Button(self.add_task_frame, text="Back", command=self.create_main_screen).grid(row=5, column=0, columnspan=2, pady=10)
+
+    def add_task(self):
+        description = self.description_entry.get()
+        priority = self.priority_var.get()
+        due_date = self.due_date_entry.get()
+        category = self.category_entry.get()
+
+        if description:
             task = {
-                'id': len(users[user]) + 1,
-                'description': row['description'],
-                'priority': row['priority'],
-                'due_date': row['due_date'],
-                'category': row['category'],
-                'status': row['status']
+                'id': len(users[self.current_user]) + 1,
+                'description': description,
+                'priority': priority,
+                'due_date': due_date,
+                'category': category,
+                'status': 'pending'
             }
-            users[user].append(task)
-
-    print(f"Tasks for {user} imported from {filename}.")
-
-def main():
-    load_tasks_from_file()  # Load tasks from file on startup
-
-    parser = argparse.ArgumentParser(description="Python To-Do List Tracker")
-    parser.add_argument('command', choices=['add', 'list', 'complete', 'edit', 'delete', 'export', 'import'], help='Command to execute')
-    parser.add_argument('--user', required=True, help='Username for task management')
-    parser.add_argument('--description', help='Task description for add or edit command')
-    parser.add_argument('--priority', choices=['low', 'medium', 'high'], default=None, help='Task priority for add or edit command')
-    parser.add_argument('--due_date', help='Due date for the task (optional)')
-    parser.add_argument('--category', help='Task category for add or edit command')
-    parser.add_argument('--task_id', type=int, help='Task ID for edit, complete, or delete command')
-    parser.add_argument('--filter_by', choices=['priority', 'category'], help='Filter tasks by priority or category')
-    parser.add_argument('--filter_value', help='Value for filtering tasks (e.g., "high" for priority, "Work" for category)')
-    parser.add_argument('--reminders', action='store_true', help='Show due date reminders')
-    parser.add_argument('--sort_by', choices=['description', 'priority', 'due_date', 'status'], help='Sort tasks by a specific field')
-    parser.add_argument('--filename', help='Filename for export or import')
-
-    args = parser.parse_args()
-
-    if args.command == 'add':
-        if args.description:
-            add_task(args.user, args.description, args.priority, args.due_date, args.category)
+            users[self.current_user].append(task)
+            save_tasks_to_file()
+            messagebox.showinfo("Success", "Task added successfully!")
+            self.create_main_screen()
         else:
-            print("Error: Missing task description. Use '--description <task_description>'.")
-    elif args.command == 'list':
-        list_tasks(args.user, args.filter_by, args.filter_value, args.reminders, args.sort_by)
-    elif args.command == 'complete':
-        if args.task_id:
-            mark_task_complete(args.user, args.task_id)
-        else:
-            print("Error: Missing task ID. Use '--task_id <task_id>'.")
-    elif args.command == 'edit':
-        if args.task_id:
-            edit_task(args.user, args.task_id, args.description, args.priority, args.due_date, args.category)
-        else:
-            print("Error: Missing task ID. Use '--task_id <task_id>'.")
-    elif args.command == 'delete':
-        if args.task_id:
-            delete_task(args.user, args.task_id)
-        else:
-            print("Error: Missing task ID. Use '--task_id <task_id>'.")
-    elif args.command == 'export':
-        if args.filename:
-            export_tasks_to_csv(args.user, args.filename)
-        else:
-            print("Error: Missing filename. Use '--filename <filename>'.")
-    elif args.command == 'import':
-        if args.filename:
-            import_tasks_from_csv(args.user, args.filename)
-        else:
-            print("Error: Missing filename. Use '--filename <filename>'.")
+            messagebox.showerror("Error", "Please enter a task description")
 
-    save_tasks_to_file()  # Save tasks to file after each modification
+    def list_tasks(self):
+        self.clear_screen()
+
+        self.list_tasks_frame = tk.Frame(self.root)
+        self.list_tasks_frame.pack(pady=20)
+
+self.delete_task(task_id)).grid(row=idx+1, column=8)
+        else:
+            tk.Label(self.list_tasks_frame, text="No tasks found.").grid(row=1, column=0, columnspan=4)
+
+        tk.Button(self.list_tasks_frame, text="Back", command=self.create_main_screen).grid(row=len(tasks)+2, column=0, columnspan=4, pady=10)
+
+    def complete_task(self, task_id):
+        for task in users[self.current_user]:
+            if task['id'] == task_id:
+                task['status'] = 'completed'
+                save_tasks_to_file()
+                messagebox.showinfo("Success", f"Task ID {task_id} marked as completed.")
+                self.list_tasks()
+                return
+        messagebox.showerror("Error", f"Task ID {task_id} not found.")
+
+    def create_edit_task_screen(self, task_id):
+        self.clear_screen()
+
+        self.edit_task_frame = tk.Frame(self.root)
+        self.edit_task_frame.pack(pady=20)
+
+        for task in users[self.current_user]:
+            if task['id'] == task_id:
+                self.current_task = task
+                break
+        else:
+            messagebox.showerror("Error", f"Task ID {task_id} not found.")
+            self.create_main_screen()
+            return
 
 if __name__ == "__main__":
-    main()
+    load_tasks_from_file()  # Load tasks from file on startup
+
+    root = tk.Tk()
+    app = TodoApp(root)
+    root.mainloop()
