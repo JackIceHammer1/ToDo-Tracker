@@ -1,6 +1,6 @@
 import argparse
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Initialize tasks list (will store dictionary objects for enhanced details)
 tasks = []
@@ -18,32 +18,31 @@ def add_task(task_description, priority='low', due_date=None, category=None):
     tasks.append(task)
     print(f"Task added: '{task_description}'")
 
-def list_tasks(category_filter=None):
-    """Display all tasks in the task list, optionally filtered by category."""
-    if tasks:
+def list_tasks(filter_by=None, filter_value=None, reminders=False):
+    """Display all tasks in the task list, with optional filtering."""
+    if filter_by and filter_value:
+        filtered_tasks = [task for task in tasks if task[filter_by] == filter_value]
+    else:
+        filtered_tasks = tasks
+    
+    if filtered_tasks:
         print("Tasks:")
-        for task in tasks:
-            if category_filter and task['category'] != category_filter:
-                continue
+        for task in filtered_tasks:
             print(f"ID: {task['id']}, Description: {task['description']}, Priority: {task['priority']}, Due Date: {task['due_date']}, Category: {task['category']}, Status: {task['status']}")
+            if reminders:
+                check_due_date(task)
     else:
         print("No tasks found.")
 
-def list_upcoming_tasks(days=3):
-    """Display tasks with due dates approaching within the specified number of days."""
-    upcoming_tasks = []
-    now = datetime.now()
-    for task in tasks:
-        if task['due_date']:
-            due_date = datetime.strptime(task['due_date'], '%Y-%m-%d')
-            if now <= due_date <= now + timedelta(days=days):
-                upcoming_tasks.append(task)
-    if upcoming_tasks:
-        print(f"Tasks due within {days} days:")
-        for task in upcoming_tasks:
-            print(f"ID: {task['id']}, Description: {task['description']}, Due Date: {task['due_date']}, Priority: {task['priority']}, Category: {task['category']}, Status: {task['status']}")
-    else:
-        print(f"No tasks due within the next {days} days.")
+def check_due_date(task):
+    """Check if a task's due date is approaching or overdue and print a reminder."""
+    if task['due_date']:
+        due_date = datetime.strptime(task['due_date'], "%Y-%m-%d")
+        days_left = (due_date - datetime.now()).days
+        if days_left < 0:
+            print(f"Reminder: Task ID {task['id']} is overdue!")
+        elif days_left <= 3:
+            print(f"Reminder: Task ID {task['id']} is due in {days_left} days.")
 
 def mark_task_complete(task_id):
     """Mark a task as complete."""
@@ -52,7 +51,7 @@ def mark_task_complete(task_id):
             task['status'] = 'completed'
             print(f"Task ID {task_id} marked as completed.")
             return
-    print(f"Error: Task ID {task_id} not found.")
+    print(f"Task ID {task_id} not found.")
 
 def edit_task(task_id, new_description=None, new_priority=None, new_due_date=None, new_category=None):
     """Edit an existing task."""
@@ -68,7 +67,7 @@ def edit_task(task_id, new_description=None, new_priority=None, new_due_date=Non
                 task['category'] = new_category
             print(f"Task ID {task_id} has been updated.")
             return
-    print(f"Error: Task ID {task_id} not found.")
+    print(f"Task ID {task_id} not found.")
 
 def delete_task(task_id):
     """Delete a task from the task list."""
@@ -83,7 +82,7 @@ def delete_task(task_id):
             else:
                 print("Task deletion canceled.")
                 return
-    print(f"Error: Task ID {task_id} not found.")
+    print(f"Task ID {task_id} not found.")
 
 def save_tasks_to_file(filename='tasks.json'):
     """Save tasks to a JSON file."""
@@ -103,13 +102,15 @@ def main():
     load_tasks_from_file()  # Load tasks from file on startup
 
     parser = argparse.ArgumentParser(description="Python To-Do List Tracker")
-    parser.add_argument('command', choices=['add', 'list', 'complete', 'edit', 'delete', 'upcoming'], help='Command to execute')
+    parser.add_argument('command', choices=['add', 'list', 'complete', 'edit', 'delete'], help='Command to execute')
     parser.add_argument('--description', help='Task description for add or edit command')
     parser.add_argument('--priority', choices=['low', 'medium', 'high'], default=None, help='Task priority for add or edit command')
     parser.add_argument('--due_date', help='Due date for the task (optional)')
     parser.add_argument('--category', help='Task category for add or edit command')
     parser.add_argument('--task_id', type=int, help='Task ID for edit, complete, or delete command')
-    parser.add_argument('--days', type=int, default=3, help='Number of days for upcoming tasks filter')
+    parser.add_argument('--filter_by', choices=['priority', 'category'], help='Filter tasks by priority or category')
+    parser.add_argument('--filter_value', help='Value for filtering tasks (e.g., "high" for priority, "Work" for category)')
+    parser.add_argument('--reminders', action='store_true', help='Show due date reminders')
 
     args = parser.parse_args()
 
@@ -119,7 +120,7 @@ def main():
         else:
             print("Error: Missing task description. Use '--description <task_description>'.")
     elif args.command == 'list':
-        list_tasks(args.category)
+        list_tasks(args.filter_by, args.filter_value, args.reminders)
     elif args.command == 'complete':
         if args.task_id:
             mark_task_complete(args.task_id)
@@ -135,8 +136,6 @@ def main():
             delete_task(args.task_id)
         else:
             print("Error: Missing task ID. Use '--task_id <task_id>'.")
-    elif args.command == 'upcoming':
-        list_upcoming_tasks(args.days)
 
     save_tasks_to_file()  # Save tasks to file after each modification
 
